@@ -1,0 +1,118 @@
+CREATE SCHEMA IF NOT EXISTS `mentormate` DEFAULT CHARACTER SET utf8 ;
+USE `mentormate` ;
+
+CREATE TABLE IF NOT EXISTS `mentormate`.`clients` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `adress` VARCHAR(200) NOT NULL,
+  `name` VARCHAR(100) NOT NULL,
+  `bulstat` VARCHAR(45) NOT NULL,
+  `isItByDDS` BLOB NOT NULL,
+  `MOL` VARCHAR(200) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`))
+ENGINE = InnoDB
+AUTO_INCREMENT = 3
+DEFAULT CHARACTER SET = utf8;
+
+CREATE TABLE IF NOT EXISTS `mentormate`.`products` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(45) NOT NULL,
+  `description` VARCHAR(200) NOT NULL,
+  `weight` DECIMAL(2,0) NOT NULL,
+  `price` DECIMAL(2,0) NULL DEFAULT NULL,
+  PRIMARY KEY (`id`))
+ENGINE = InnoDB
+AUTO_INCREMENT = 3
+DEFAULT CHARACTER SET = utf8;
+
+CREATE TABLE IF NOT EXISTS `mentormate`.`purch_history` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `client` INT NOT NULL,
+  `price` DECIMAL(2,0) NOT NULL,
+  `invoice_number` VARCHAR(45) NOT NULL,
+  `data` DATETIME NOT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `ph_client`
+    FOREIGN KEY (`client`)
+    REFERENCES `mentormate`.`clients` (`id`))
+ENGINE = InnoDB
+AUTO_INCREMENT = 3
+DEFAULT CHARACTER SET = utf8;
+
+CREATE INDEX `ph_client_idx` ON `mentormate`.`purch_history` (`client` ASC) VISIBLE;
+
+CREATE TABLE IF NOT EXISTS `mentormate`.`products_purch` (
+  `product` INT NOT NULL,
+  `purch` INT NOT NULL,
+  `quantity` INT NOT NULL,
+  PRIMARY KEY (`product`, `purch`),
+  CONSTRAINT `pp_product`
+    FOREIGN KEY (`product`)
+    REFERENCES `mentormate`.`products` (`id`),
+  CONSTRAINT `pp_purch`
+    FOREIGN KEY (`purch`)
+    REFERENCES `mentormate`.`purch_history` (`id`))
+ENGINE = InnoDB
+DEFAULT CHARACTER SET = utf8;
+
+CREATE INDEX `pp_purch_idx` ON `mentormate`.`products_purch` (`purch` ASC) VISIBLE;
+
+USE `mentormate` ;
+
+DELIMITER $$
+USE `mentormate`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `All_products_last_30_days`()
+BEGIN
+SELECT DISTINCT products.id AS nomber, products.name, 
+(SELECT SUM(products_purch.quantity) From products_purch 
+JOIN products ON(products_purch.product = products.id)
+where products_purch.product = nomber) AS quantity FROM products
+JOIN products_purch ON(products_purch.product = products.id)
+JOIN purch_history ON(products_purch.product = purch_history.id)
+WHERE (DATE(purch_history.data) >= DATE(NOW()) - INTERVAL 30 DAY) ;
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+USE `mentormate`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `find_by_part_of_name`(
+part VARCHAR(200)
+)
+BEGIN
+SELECT * FROM products WHERE 'neme' LIKE  ('%' + part+'%');
+END$$
+
+DELIMITER ;
+
+DELIMITER $$
+USE `mentormate`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `ivoice_number`(
+invoice_numberer VARCHAR(45)
+)
+BEGIN
+Select products_purch.product, products.price, clients.name AS CLient_Name  from products_purch 
+JOIN products ON(products_purch.product = products.id)
+JOIN purch_history ON(products_purch.product = purch_history.id)
+JOIN clients ON (purch_history.client = clients.id)
+WHERE purch_history.invoice_number = invoice_numberer;
+END$$
+
+DELIMITER ;
+
+
+
+DELIMITER $$
+USE `mentormate`$$
+CREATE DEFINER=`root`@`localhost` PROCEDURE `purch_last_30_days`(
+client_name VARCHAR(100)
+)
+BEGIN
+SELECT products.name, products_purch.quantity, purch_history.data FROM products_purch 
+JOIN products ON(products_purch.product = products.id)
+JOIN purch_history ON(products_purch.product = purch_history.id)
+JOIN clients ON (purch_history.client = clients.id)
+WHERE (DATE(purch_history.data) >= DATE(NOW()) - INTERVAL 30 DAY)
+AND clients.name = client_name;
+END$$
+
+DELIMITER ;
